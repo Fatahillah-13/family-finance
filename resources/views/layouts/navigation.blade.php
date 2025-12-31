@@ -31,6 +31,10 @@
                     <x-nav-link :href="route('households.index')" :active="request()->routeIs('households.*')">
                         {{ __('Households') }}
                     </x-nav-link>
+
+                    <x-nav-link :href="route('transactions.index')" :active="request()->routeIs('transactions.*')">
+                        {{ __('Transactions') }}
+                    </x-nav-link>
                 </div>
             </div>
 

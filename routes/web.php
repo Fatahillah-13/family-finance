@@ -6,6 +6,7 @@ use App\Http\Controllers\HouseholdMemberController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
@@ -41,6 +42,30 @@ Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
         Route::post('/tags', [TagController::class, 'store'])->name('tags.store');
         Route::patch('/tags/{tag}', [TagController::class, 'update'])->name('tags.update');
         Route::post('/tags/{tag}/toggle', [TagController::class, 'toggle'])->name('tags.toggle');
+    });
+
+    // Transactions
+    Route::middleware(['permission:transactions.read'])->group(function () {
+        Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    });
+
+    Route::middleware(['permission:transactions.create'])->group(function () {
+        Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
+        Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
+    });
+
+    Route::middleware(['permission:transactions.update'])->group(function () {
+        Route::get('/transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
+        Route::patch('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
+    });
+
+    Route::middleware(['permission:transactions.delete'])->group(function () {
+        Route::delete('/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+        Route::post('/transaction-attachments/{attachment}/delete', [TransactionController::class, 'deleteAttachment'])->name('transactions.attachments.delete');
+    });
+
+    Route::middleware(['permission:transactions.read'])->group(function () {
+        Route::get('/transaction-attachments/{attachment}/download', [TransactionController::class, 'downloadAttachment'])->name('transactions.attachments.download');
     });
 });
 
