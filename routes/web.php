@@ -7,12 +7,29 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
 
 Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
-    Route::get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    // Budgets
+    Route::middleware(['permission:budgets.read'])->group(function () {
+        Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
+    });
+    Route::middleware(['permission:budgets.manage'])->group(function () {
+        Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
+        Route::patch('/budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
+        Route::post('/budgets/{budget}/toggle', [BudgetController::class, 'toggle'])->name('budgets.toggle');
+    });
+
+    Route::middleware(['permission:reports.read'])->group(function () {
+        Route::get('/reports/monthly', [ReportController::class, 'monthly'])->name('reports.monthly');
+    });
 
     // Accounts
     Route::middleware(['permission:accounts.read'])->group(function () {
