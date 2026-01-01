@@ -18,19 +18,85 @@
 
             <div class="bg-white shadow-sm sm:rounded-lg">
                 <div class="p-6">
-                    <form method="GET" class="flex flex-wrap gap-3 items-end">
-                        <div>
-                            <x-input-label for="type" value="Filter Type" />
-                            <select id="type" name="type" class="mt-1 border-gray-300 rounded-md shadow-sm">
-                                <option value="">(All)</option>
-                                <option value="expense" @selected(request('type') === 'expense')>expense</option>
-                                <option value="income" @selected(request('type') === 'income')>income</option>
-                                <option value="transfer" @selected(request('type') === 'transfer')>transfer</option>
+                    <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+                        <div class="md:col-span-1">
+                            <x-input-label for="type" value="Type" />
+                            <select id="type" name="type"
+                                class="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="" @selected(($f['type'] ?? '') === '')>(All)</option>
+                                <option value="expense" @selected(($f['type'] ?? '') === 'expense')>expense</option>
+                                <option value="income" @selected(($f['type'] ?? '') === 'income')>income</option>
+                                <option value="transfer" @selected(($f['type'] ?? '') === 'transfer')>transfer</option>
                             </select>
                         </div>
 
-                        <x-primary-button type="submit">Filter</x-primary-button>
-                        <a class="text-sm underline" href="{{ route('transactions.index') }}">Reset</a>
+                        <div class="md:col-span-1">
+                            <x-input-label for="date_from" value="From" />
+                            <x-text-input id="date_from" name="date_from" type="date" class="mt-1 w-full"
+                                value="{{ $f['date_from'] ?? '' }}" />
+                        </div>
+
+                        <div class="md:col-span-1">
+                            <x-input-label for="date_to" value="To" />
+                            <x-text-input id="date_to" name="date_to" type="date" class="mt-1 w-full"
+                                value="{{ $f['date_to'] ?? '' }}" />
+                        </div>
+
+                        <div class="md:col-span-1">
+                            <x-input-label for="account_id" value="Account" />
+                            <select id="account_id" name="account_id"
+                                class="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="">(All)</option>
+                                @foreach ($accounts as $a)
+                                    <option value="{{ $a->id }}" @selected(($f['account_id'] ?? null) == $a->id)>
+                                        {{ $a->name }} @if (!$a->is_active)
+                                            (inactive)
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-1">
+                            <x-input-label for="category_id" value="Category" />
+                            <select id="category_id" name="category_id"
+                                class="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="">(All)</option>
+                                @foreach ($categories as $c)
+                                    <option value="{{ $c->id }}" @selected(($f['category_id'] ?? null) == $c->id)>
+                                        {{ $c->name }} ({{ $c->type }}) @if (!$c->is_active)
+                                            (inactive)
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-1">
+                            <x-input-label for="tag_id" value="Tag" />
+                            <select id="tag_id" name="tag_id"
+                                class="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="">(All)</option>
+                                @foreach ($tags as $t)
+                                    <option value="{{ $t->id }}" @selected(($f['tag_id'] ?? null) == $t->id)>
+                                        {{ $t->name }} @if (!$t->is_active)
+                                            (inactive)
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-5">
+                            <x-input-label for="q" value="Search (description/account/category)" />
+                            <x-text-input id="q" name="q" type="text" class="mt-1 w-full"
+                                placeholder="mis. 'internet' atau 'BCA' atau 'Makan'" value="{{ $f['q'] ?? '' }}" />
+                        </div>
+
+                        <div class="md:col-span-1 flex gap-2">
+                            <x-primary-button type="submit">Apply</x-primary-button>
+                            <a class="text-sm underline pt-2" href="{{ route('transactions.index') }}">Reset</a>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -41,8 +107,9 @@
                         @foreach ($transactions as $t)
                             <div class="border rounded p-3 flex items-start justify-between">
                                 <div>
-                                    <div class="text-sm text-gray-600">{{ $t->occurred_at->format('Y-m-d H:i') }} •
-                                        {{ $t->type }}</div>
+                                    <div class="text-sm text-gray-600">
+                                        {{ $t->occurred_at->format('Y-m-d H:i') }} • {{ $t->type }}
+                                    </div>
 
                                     <div class="font-medium">
                                         Rp {{ number_format($t->amount, 0, ',', '.') }}
@@ -89,7 +156,7 @@
                     </div>
 
                     @if ($transactions->isEmpty())
-                        <div class="text-gray-600">Belum ada transaksi.</div>
+                        <div class="text-gray-600">Tidak ada transaksi sesuai filter.</div>
                     @endif
                 </div>
             </div>

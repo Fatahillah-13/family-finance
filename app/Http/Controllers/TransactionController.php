@@ -8,6 +8,7 @@ use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\TransactionAttachment;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -21,21 +22,122 @@ class TransactionController extends Controller
         $hid = $user->active_household_id;
         abort_unless($hid, 403);
 
-        $query = Transaction::query()
-            ->with(['account', 'category', 'fromAccount', 'toAccount', 'tags'])
-            ->where('household_id', $hid);
+        // Filters
+        $type = $request->string('type')->toString();
+        $dateFrom = $request->string('date_from')->toString(); // YYYY-MM-DD
+        $dateTo = $request->string('date_to')->toString();     // YYYY-MM-DD
+        $accountId = $request->integer('account_id');
+        $categoryId = $request->integer('category_id');
+        $tagId = $request->integer('tag_id');
+        $q = trim($request->string('q')->toString());
 
-        // Simple filters (optional)
-        if ($request->filled('type')) {
-            $query->where('type', $request->string('type'));
+        $query = Transaction::query()
+            ->where('transactions.household_id', $hid)
+            ->whereNull('transactions.deleted_at');
+
+        // Type
+        if (in_array($type, ['income', 'expense', 'transfer'], true)) {
+            $query->where('transactions.type', $type);
         }
 
+        // Date range (use occurred_at date)
+        if ($dateFrom !== '') {
+            $from = Carbon::parse($dateFrom)->startOfDay();
+            $query->where('transactions.occurred_at', '>=', $from);
+        }
+        if ($dateTo !== '') {
+            $to = Carbon::parse($dateTo)->endOfDay();
+            $query->where('transactions.occurred_at', '<=', $to);
+        }
+
+        // Account filter:
+        // - income/expense: match account_id
+        // - transfer: match from OR to
+        if ($accountId) {
+            $query->where(function ($qq) use ($accountId) {
+                $qq->where('transactions.account_id', $accountId)
+                    ->orWhere('transactions.from_account_id', $accountId)
+                    ->orWhere('transactions.to_account_id', $accountId);
+            });
+        }
+
+        // Category filter (income/expense only logically, but safe)
+        if ($categoryId) {
+            $query->where('transactions.category_id', $categoryId);
+        }
+
+        // Tag filter (exists on pivot)
+        if ($tagId) {
+            $query->whereExists(function ($sub) use ($tagId) {
+                $sub->selectRaw(1)
+                    ->from('transaction_tag')
+                    ->whereColumn('transaction_tag.transaction_id', 'transactions.id')
+                    ->where('transaction_tag.tag_id', $tagId);
+            });
+        }
+
+        // Search (description + account + category + transfer accounts)
+        if ($q !== '') {
+            // join for searching names
+            $query
+                ->leftJoin('accounts as a', 'a.id', '=', 'transactions.account_id')
+                ->leftJoin('categories as c', 'c.id', '=', 'transactions.category_id')
+                ->leftJoin('accounts as fa', 'fa.id', '=', 'transactions.from_account_id')
+                ->leftJoin('accounts as ta', 'ta.id', '=', 'transactions.to_account_id')
+                ->where(function ($qq) use ($q) {
+                    $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+                    $qq->where('transactions.description', 'like', $like)
+                        ->orWhere('a.name', 'like', $like)
+                        ->orWhere('c.name', 'like', $like)
+                        ->orWhere('fa.name', 'like', $like)
+                        ->orWhere('ta.name', 'like', $like);
+                })
+                ->select('transactions.*'); // important to avoid selecting joined columns into model
+        }
+
+        // Eager-load relations for display
+        $query->with(['account', 'category', 'fromAccount', 'toAccount', 'tags']);
+
         $transactions = $query
-            ->orderByDesc('occurred_at')
+            ->orderByDesc('transactions.occurred_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('transactions.index', compact('transactions'));
+        // Dropdown data
+        $accounts = Account::query()
+            ->where('household_id', $hid)
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
+
+        $categories = Category::query()
+            ->where('household_id', $hid)
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+
+        $tags = Tag::query()
+            ->where('household_id', $hid)
+            ->orderBy('name')
+            ->get();
+
+        return view('transactions.index', [
+            'transactions' => $transactions,
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'tags' => $tags,
+
+            // current filters (for form values)
+            'f' => [
+                'type' => $type,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'account_id' => $accountId,
+                'category_id' => $categoryId,
+                'tag_id' => $tagId,
+                'q' => $q,
+            ],
+        ]);
     }
 
     public function create(Request $request)
