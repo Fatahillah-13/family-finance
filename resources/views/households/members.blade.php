@@ -46,14 +46,19 @@
 
                     <div class="space-y-3">
                         @foreach ($memberships as $m)
-                            <div class="flex items-center justify-between border rounded p-3">
-                                <div>
-                                    <div class="font-medium">
-                                        {{ $m->user->name }} <span
-                                            class="text-sm text-gray-600">({{ $m->user->email }})</span>
-                                    </div>
-                                    <div class="text-sm text-gray-600">Role: {{ $m->role->name }}</div>
-                                </div>
+                            <div class="flex items-center gap-3">
+                                <form method="POST" action="{{ route('households.members.role.update', $m) }}"
+                                    class="flex items-center gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <select name="role_id" class="border-gray-300 rounded-md shadow-sm text-sm">
+                                        @foreach ($roles as $role)
+                                            <option value="{{ $role->id }}" @selected($m->role_id === $role->id)>
+                                                {{ $role->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-secondary-button type="submit">Set</x-secondary-button>
+                                </form>
 
                                 <form method="POST" action="{{ route('households.members.destroy', $m) }}"
                                     onsubmit="return confirm('Hapus member ini dari household?');">

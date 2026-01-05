@@ -43,6 +43,10 @@
                     <x-nav-link :href="route('reports.monthly')" :active="request()->routeIs('reports.*')">
                         {{ __('Reports') }}
                     </x-nav-link>
+
+                    <x-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
+                        {{ __('Roles') }}
+                    </x-nav-link>
                 </div>
             </div>
 

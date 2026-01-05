@@ -28,6 +28,7 @@ class HouseholdMemberController extends Controller
 
         $roles = Role::query()
             ->where('household_id', $householdId)
+            ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
@@ -88,5 +89,35 @@ class HouseholdMemberController extends Controller
         $membership->delete();
 
         return redirect()->route('households.members');
+    }
+
+    public function updateRole(Request $request, HouseholdMembership $membership)
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        $hid = $actor->active_household_id;
+
+        abort_unless($hid, 403);
+        abort_unless($membership->household_id === $hid, 403);
+
+        $validated = $request->validate([
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+        ]);
+
+        $role = Role::query()
+            ->where('household_id', $hid)
+            ->where('id', $validated['role_id'])
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        // Safety: jangan ubah role sendiri dari Owner -> lainnya (biar gak lockout)
+        if ($membership->user_id === $actor->id && $membership->role?->name === 'Owner' && $role->name !== 'Owner') {
+            return back()->withErrors(['member' => 'Tidak boleh menurunkan role Owner untuk diri sendiri.']);
+        }
+
+        $membership->role_id = $role->id;
+        $membership->save();
+
+        return back();
     }
 }

@@ -10,6 +10,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
@@ -83,6 +84,24 @@ Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
 
     Route::middleware(['permission:transactions.read'])->group(function () {
         Route::get('/transaction-attachments/{attachment}/download', [TransactionController::class, 'downloadAttachment'])->name('transactions.attachments.download');
+    });
+
+    // Roles
+    Route::middleware(['permission:roles.manage'])->group(function () {
+        Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+        Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+        Route::patch('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+        Route::post('/roles/{role}/toggle', [RoleController::class, 'toggle'])->name('roles.toggle');
+    });
+
+    Route::middleware(['permission:permissions.assign'])->group(function () {
+        Route::post('/roles/{role}/permissions', [RoleController::class, 'syncPermissions'])->name('roles.permissions.sync');
+    });
+
+    // Update member role (assign role)
+    Route::middleware(['permission:household.members.manage'])->group(function () {
+        Route::patch('/households/members/{membership}/role', [HouseholdMemberController::class, 'updateRole'])
+            ->name('households.members.role.update');
     });
 });
 
