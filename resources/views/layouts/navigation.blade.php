@@ -47,6 +47,10 @@
                     <x-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
                         {{ __('Roles') }}
                     </x-nav-link>
+
+                    <x-nav-link :href="route('imports.create')" :active="request()->routeIs('imports.*')">
+                        {{ __('Import CSV') }}
+                    </x-nav-link>
                 </div>
             </div>
 

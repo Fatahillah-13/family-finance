@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\ImportTransactionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
@@ -102,6 +103,14 @@ Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
     Route::middleware(['permission:household.members.manage'])->group(function () {
         Route::patch('/households/members/{membership}/role', [HouseholdMemberController::class, 'updateRole'])
             ->name('households.members.role.update');
+    });
+
+    // Import Transaction
+    Route::middleware(['permission:transactions.create'])->group(function () {
+        Route::get('/imports/transactions', [ImportTransactionController::class, 'create'])->name('imports.create');
+        Route::post('/imports/transactions', [ImportTransactionController::class, 'store'])->name('imports.store');
+        Route::get('/imports/transactions/{import}/preview', [ImportTransactionController::class, 'preview'])->name('imports.preview');
+        Route::post('/imports/transactions/{import}/commit', [ImportTransactionController::class, 'commit'])->name('imports.commit');
     });
 });
 

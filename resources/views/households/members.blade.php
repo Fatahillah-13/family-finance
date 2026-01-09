@@ -66,7 +66,7 @@
                                     @method('DELETE')
                                     <x-danger-button type="submit">Remove</x-danger-button>
                                 </form>
-                            </div>
+                            </div>github
                         @endforeach
                     </div>
 
