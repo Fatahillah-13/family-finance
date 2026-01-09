@@ -13,6 +13,8 @@ class TransactionImportRow extends Model
         'description',
         'amount',
         'type',
+        'from_account_id',
+        'to_account_id',
         'hash',
         'raw',
     ];
@@ -22,6 +24,8 @@ class TransactionImportRow extends Model
         return [
             'occurred_date' => 'date',
             'amount' => 'integer',
+            'from_account_id' => 'integer',
+            'to_account_id' => 'integer',
             'raw' => 'array',
         ];
     }

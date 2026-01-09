@@ -46,15 +46,21 @@ class ImportTransactionController extends Controller
             'col_description' => ['required', 'integer', 'min:0'],
             'col_amount' => ['required', 'integer', 'min:0'],
             'col_type' => ['nullable', 'integer', 'min:0'],
+            'col_from_account' => ['nullable', 'integer', 'min:0'],
+            'col_to_account' => ['nullable', 'integer', 'min:0'],
             'has_header' => ['nullable'],
             // date format for parsing
             'date_format' => ['required', 'string'], // e.g. Y-m-d, d/m/Y
         ]);
 
-        $account = Account::query()
+        $defaultAccount = Account::query()
             ->where('household_id', $hid)
             ->where('id', $validated['account_id'])
             ->firstOrFail();
+
+        $accounts = Account::query()
+            ->where('household_id', $hid)
+            ->get(['id', 'name']);
 
         $file = $request->file('csv');
         $path = $file->getRealPath();
@@ -62,7 +68,7 @@ class ImportTransactionController extends Controller
 
         $import = TransactionImport::create([
             'household_id' => $hid,
-            'account_id' => $account->id,
+            'account_id' => $defaultAccount->id,
             'created_by' => $user->id,
             'original_filename' => $file->getClientOriginalName(),
             'status' => 'draft',
@@ -78,6 +84,8 @@ class ImportTransactionController extends Controller
         $colDesc = (int) $validated['col_description'];
         $colAmount = (int) $validated['col_amount'];
         $colType = $validated['col_type'] !== null ? (int) $validated['col_type'] : null;
+        $colFrom = $validated['col_from_account'] !== null ? (int) $validated['col_from_account'] : null;
+        $colTo = $validated['col_to_account'] !== null ? (int) $validated['col_to_account'] : null;
         $dateFormat = $validated['date_format'];
 
         $toInsert = [];
@@ -106,9 +114,34 @@ class ImportTransactionController extends Controller
 
             [$amount, $type] = $parsed; // amount int positive, type income|expense
 
+            $fromAccountId = null;
+            $toAccountId = null;
+            $error = null;
+
+            if ($type === 'transfer') {
+                if ($colFrom === null || $colTo === null) {
+                    $error = 'transfer membutuhkan col_from_account dan col_to_account';
+                } else {
+                    $fromRaw = (string) ($cols[$colFrom] ?? '');
+                    $toRaw = (string) ($cols[$colTo] ?? '');
+
+                    $fromAccountId = $this->resolveAccountIdByContains($accounts, $fromRaw);
+                    $toAccountId = $this->resolveAccountIdByContains($accounts, $toRaw);
+
+                    if (!$fromAccountId || !$toAccountId) {
+                        $error = 'from/to account tidak ditemukan atau ambigu';
+                    } elseif ($fromAccountId === $toAccountId) {
+                        $error = 'from/to account tidak boleh sama';
+                    }
+                }
+            }
+
             // hash includes account + date + amount + description (normalized)
             $normDesc = mb_strtolower(trim(preg_replace('/\s+/', ' ', $desc)));
-            $hash = hash('sha256', $account->id . '|' . $occurredDate->format('Y-m-d') . '|' . $amount . '|' . $normDesc);
+            $keyBase = $type === 'transfer'
+                ? ($fromAccountId . '|' . $toAccountId)
+                : (string) $defaultAccount->id;
+            $hash = hash('sha256', $type . '|' . $keyBase . '|' . $occurredDate->format('Y-m-d') . '|' . $amount . '|' . $normDesc);
 
             $toInsert[] = [
                 'transaction_import_id' => $import->id,
@@ -116,6 +149,8 @@ class ImportTransactionController extends Controller
                 'description' => $desc !== '' ? $desc : null,
                 'amount' => $amount,
                 'type' => $type,
+                'from_account_id' => $fromAccountId,
+                'to_account_id' => $toAccountId,
                 'hash' => $hash,
                 'raw' => json_encode([
                     'row_index' => $i,
@@ -170,13 +205,20 @@ class ImportTransactionController extends Controller
                     Carbon::parse($minDate)->startOfDay(),
                     Carbon::parse($maxDate)->endOfDay()
                 ])
-                ->get(['id', 'occurred_at', 'amount', 'description', 'type']);
+                ->get(['id', 'type', 'occurred_at', 'amount', 'description', 'account_id', 'from_account_id', 'to_account_id']);
 
-            $existing = $candidates->map(function ($t) use ($import) {
+            $existing = $candidates->map(function ($t) {
                 $normDesc = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) $t->description)));
                 $date = Carbon::parse($t->occurred_at)->format('Y-m-d');
-                return hash('sha256', $import->account_id . '|' . $date . '|' . ((int)$t->amount) . '|' . $normDesc);
-            })->flip(); // set-like
+                $amount = (int) $t->amount;
+                $type = (string) $t->type;
+
+                $keyBase = $type === 'transfer'
+                    ? ((int) $t->from_account_id . '|' . (int) $t->to_account_id)
+                    : (string) ((int) $t->account_id);
+
+                return hash('sha256', $type . '|' . $keyBase . '|' . $date . '|' . $amount . '|' . $normDesc);
+            })->flip();
         }
 
         $preview = $rows->map(function (TransactionImportRow $r) use ($existing) {
@@ -186,6 +228,9 @@ class ImportTransactionController extends Controller
                 'type' => $r->type,
                 'amount' => $r->amount,
                 'description' => $r->description,
+                'from_account_id' => $r->from_account_id,
+                'to_account_id' => $r->to_account_id,
+                'error' => $r->error,
                 'is_duplicate' => $existing->has($r->hash),
             ];
         });
@@ -193,7 +238,8 @@ class ImportTransactionController extends Controller
         $counts = [
             'total' => $preview->count(),
             'duplicates' => $preview->where('is_duplicate', true)->count(),
-            'new' => $preview->where('is_duplicate', false)->count(),
+            'errors' => $preview->filter(fn($x) => !empty($x['error']))->count(),
+            'new' => $preview->filter(fn($x) => !$x['is_duplicate'] && empty($x['error']))->count(),
         ];
 
         return view('imports.preview', [
@@ -258,17 +304,25 @@ class ImportTransactionController extends Controller
                     Carbon::parse($minDate)->startOfDay(),
                     Carbon::parse($maxDate)->endOfDay()
                 ])
-                ->get(['id', 'occurred_at', 'amount', 'description', 'type']);
+                ->get(['id', 'type', 'occurred_at', 'amount', 'description', 'account_id', 'from_account_id', 'to_account_id']);
 
-            $existing = $candidates->map(function ($t) use ($import) {
+            $existing = $candidates->map(function ($t) {
                 $normDesc = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) $t->description)));
                 $date = Carbon::parse($t->occurred_at)->format('Y-m-d');
-                return hash('sha256', $import->account_id . '|' . $date . '|' . ((int)$t->amount) . '|' . $normDesc);
+                $amount = (int) $t->amount;
+                $type = (string) $t->type;
+
+                $keyBase = $type === 'transfer'
+                    ? ((int) $t->from_account_id . '|' . (int) $t->to_account_id)
+                    : (string) ((int) $t->account_id);
+
+                return hash('sha256', $type . '|' . $keyBase . '|' . $date . '|' . $amount . '|' . $normDesc);
             })->flip();
         }
 
         $created = 0;
-        $skipped = 0;
+        $skippedDuplicate = 0;
+        $skippedError = 0;
 
         DB::transaction(function () use (
             $rows,
@@ -279,11 +333,36 @@ class ImportTransactionController extends Controller
             $fallbackIncomeCatId,
             $fallbackExpenseCatId,
             &$created,
-            &$skipped
+            &$skippedDuplicate,
+            &$skippedError
         ) {
             foreach ($rows as $r) {
                 if ($existing->has($r->hash)) {
-                    $skipped++;
+                    $skippedDuplicate++;
+                    continue;
+                }
+                if (!empty($r->error)) {
+                    $skippedError++;
+                    continue;
+                }
+
+                $occurredAt = Carbon::parse($r->occurred_date)->startOfDay();
+
+                if ($r->type === 'transfer') {
+                    // Transfer: category_id/account_id NULL
+                    Transaction::create([
+                        'household_id' => $hid,
+                        'type' => 'transfer',
+                        'occurred_at' => $occurredAt,
+                        'description' => $r->description,
+                        'amount' => (int) $r->amount,
+                        'account_id' => null,
+                        'category_id' => null,
+                        'from_account_id' => (int) $r->from_account_id,
+                        'to_account_id' => (int) $r->to_account_id,
+                        'created_by' => $user->id,
+                    ]);
+                    $created++;
                     continue;
                 }
 
@@ -312,7 +391,7 @@ class ImportTransactionController extends Controller
         });
 
         return redirect()->route('imports.preview', $import)
-            ->with('status', "Import selesai. Created: {$created}, skipped (duplicate): {$skipped}");
+            ->with('status', "Import selesai. Created: {$created}, skipped duplicate: {$skippedDuplicate}, skipped error: {$skippedError}");
     }
 
     private function readCsv(string $path): array
@@ -399,6 +478,10 @@ class ImportTransactionController extends Controller
 
         $typeRawNorm = mb_strtolower(trim($typeRaw));
 
+        if (in_array($typeRawNorm, ['transfer', 'xfer'], true)) {
+            return [$amount, 'transfer'];
+        }
+
         $type = null;
         if (in_array($typeRawNorm, ['income', 'in', 'credit', 'cr', 'c'], true)) $type = 'income';
         if (in_array($typeRawNorm, ['expense', 'out', 'debit', 'db', 'd'], true)) $type = 'expense';
@@ -409,5 +492,26 @@ class ImportTransactionController extends Controller
         }
 
         return [$amount, $type];
+    }
+
+    /**
+     * contains match (case-insensitive).
+     * Returns account_id if exactly 1 match, else null (none/ambiguous).
+     */
+    private function resolveAccountIdByContains($accounts, string $needle): ?int
+    {
+        $needle = mb_strtolower(trim($needle));
+        if ($needle === '') return null;
+
+        $matches = $accounts->filter(function ($a) use ($needle) {
+            $name = mb_strtolower((string) $a->name);
+            return str_contains($name, $needle) || str_contains($needle, $name);
+        })->values();
+
+        if ($matches->count() === 1) {
+            return (int) $matches->first()->id;
+        }
+
+        return null;
     }
 }

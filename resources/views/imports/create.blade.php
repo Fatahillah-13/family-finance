@@ -11,10 +11,19 @@
             <div class="bg-white shadow-sm sm:rounded-lg">
                 <div class="p-6 space-y-4">
 
-                    <div class="text-sm text-gray-700">
-                        CSV minimal harus punya kolom: <strong>tanggal</strong>, <strong>deskripsi</strong>,
-                        <strong>amount</strong>.
-                        Anda bisa mapping index kolom (0-based).
+                    <div class="text-sm text-gray-700 space-y-2">
+                        <div>
+                            CSV minimal: <strong>tanggal</strong>, <strong>deskripsi</strong>, <strong>amount</strong>.
+                        </div>
+                        <div>
+                            Jika CSV punya <strong>type</strong>, nilai yang didukung: <code>income</code>,
+                            <code>expense</code>, <code>transfer</code>.
+                        </div>
+                        <div>
+                            Jika <code>type=transfer</code>, CSV wajib punya kolom <strong>from_account</strong> dan
+                            <strong>to_account</strong> (nama akun bebas, akan dicocokkan dengan metode
+                            <em>contains</em>).
+                        </div>
                     </div>
 
                     <form method="POST" action="{{ route('imports.store') }}" enctype="multipart/form-data"
@@ -22,13 +31,17 @@
                         @csrf
 
                         <div>
-                            <x-input-label for="account_id" value="Account tujuan (wajib)" />
+                            <x-input-label for="account_id"
+                                value="Default account (untuk income/expense jika tidak ada kolom account)" />
                             <select id="account_id" name="account_id"
                                 class="mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
                                 @foreach ($accounts as $a)
                                     <option value="{{ $a->id }}">{{ $a->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="text-xs text-gray-600 mt-1">
+                                Transfer tidak memakai default account ini (transfer wajib from/to account dari CSV).
+                            </div>
                             <x-input-error :messages="$errors->get('account_id')" class="mt-2" />
                         </div>
 
@@ -64,6 +77,19 @@
                                 <x-text-input id="date_format" name="date_format" type="text" class="mt-1 w-full"
                                     value="Y-m-d" required />
                                 <div class="text-xs text-gray-600 mt-1">Contoh: Y-m-d atau d/m/Y</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <x-input-label for="col_from_account" value="col_from_account (wajib jika transfer)" />
+                                <x-text-input id="col_from_account" name="col_from_account" type="number"
+                                    min="0" class="mt-1 w-full" />
+                            </div>
+                            <div>
+                                <x-input-label for="col_to_account" value="col_to_account (wajib jika transfer)" />
+                                <x-text-input id="col_to_account" name="col_to_account" type="number" min="0"
+                                    class="mt-1 w-full" />
                             </div>
                         </div>
 
