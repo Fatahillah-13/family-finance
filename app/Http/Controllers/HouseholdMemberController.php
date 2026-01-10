@@ -7,6 +7,7 @@ use App\Models\Household;
 use App\Models\HouseholdMembership;
 use App\Models\Role;
 use App\Services\Audit;
+use App\Models\HouseholdInvitation;
 use App\Models\User;
 
 class HouseholdMemberController extends Controller
@@ -33,52 +34,59 @@ class HouseholdMemberController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('households.members', compact('household', 'memberships', 'roles'));
-    }
-
-    public function store(Request $request)
-    {
-        /** @var User $actor */
-        $actor = $request->user();
-        $householdId = $actor->active_household_id;
-
-        abort_unless($householdId, 403);
-
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'role_id' => ['required', 'integer', 'exists:roles,id'],
-        ]);
-
-        // Pastikan role milik household aktif
-        $role = Role::query()
+        $invitations = HouseholdInvitation::query()
+            ->with('role')
             ->where('household_id', $householdId)
-            ->where('id', $validated['role_id'])
-            ->firstOrFail();
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
 
-        $targetUser = User::query()
-            ->where('email', $validated['email'])
-            ->first();
-
-        if (!$targetUser) {
-            return back()
-                ->withErrors(['email' => 'Email belum terdaftar. Minta anggota register terlebih dahulu.'])
-                ->onlyInput('email');
-        }
-
-        $membership = HouseholdMembership::updateOrCreate(
-            ['household_id' => $householdId, 'user_id' => $targetUser->id],
-            ['role_id' => $role->id, 'status' => 'active']
-        );
-
-        Audit::log($householdId, $actor, 'members.add', 'HouseholdMembership', $membership->id, [
-            'member_user_id' => $targetUser->id,
-            'member_email' => $targetUser->email,
-            'role_id' => $role->id,
-            'role_name' => $role->name,
-        ]);
-
-        return redirect()->route('households.members');
+        return view('households.members', compact('household', 'memberships', 'roles', 'invitations'));
     }
+
+    // public function store(Request $request)
+    // {
+    //     /** @var User $actor */
+    //     $actor = $request->user();
+    //     $householdId = $actor->active_household_id;
+
+    //     abort_unless($householdId, 403);
+
+    //     $validated = $request->validate([
+    //         'email' => ['required', 'email'],
+    //         'role_id' => ['required', 'integer', 'exists:roles,id'],
+    //     ]);
+
+    //     // Pastikan role milik household aktif
+    //     $role = Role::query()
+    //         ->where('household_id', $householdId)
+    //         ->where('id', $validated['role_id'])
+    //         ->firstOrFail();
+
+    //     $targetUser = User::query()
+    //         ->where('email', $validated['email'])
+    //         ->first();
+
+    //     if (!$targetUser) {
+    //         return back()
+    //             ->withErrors(['email' => 'Email belum terdaftar. Minta anggota register terlebih dahulu.'])
+    //             ->onlyInput('email');
+    //     }
+
+    //     $membership = HouseholdMembership::updateOrCreate(
+    //         ['household_id' => $householdId, 'user_id' => $targetUser->id],
+    //         ['role_id' => $role->id, 'status' => 'active']
+    //     );
+
+    //     Audit::log($householdId, $actor, 'members.add', 'HouseholdMembership', $membership->id, [
+    //         'member_user_id' => $targetUser->id,
+    //         'member_email' => $targetUser->email,
+    //         'role_id' => $role->id,
+    //         'role_name' => $role->name,
+    //     ]);
+
+    //     return redirect()->route('households.members');
+    // }
 
     public function destroy(Request $request, HouseholdMembership $membership)
     {

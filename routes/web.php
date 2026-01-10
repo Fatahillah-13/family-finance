@@ -13,9 +13,17 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ImportTransactionController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\HouseholdInvitationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
+
+// Route Google auth
+Route::middleware('guest')->group(function () {
+    Route::get('/auth/google', [SocialAuthController::class, 'redirect'])->name('auth.google.redirect');
+    Route::get('/auth/google/callback', [SocialAuthController::class, 'callback'])->name('auth.google.callback');
+});
 
 
 Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
@@ -129,15 +137,27 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
+    // Households
     Route::get('/households', [HouseholdController::class, 'index'])->name('households.index');
     Route::post('/households', [HouseholdController::class, 'store'])->name('households.store');
     Route::post('/households/{household}/switch', [HouseholdController::class, 'switch'])->name('households.switch');
 
+    // Household Members
     Route::middleware(['active.household', 'permission:household.members.manage'])->group(function () {
         Route::get('/households/members', [HouseholdMemberController::class, 'index'])->name('households.members');
-        Route::post('/households/members', [HouseholdMemberController::class, 'store'])->name('households.members.store');
         Route::delete('/households/members/{membership}', [HouseholdMemberController::class, 'destroy'])->name('households.members.destroy');
     });
+
+    // inviter kirim invite (butuh active household + permission)
+    Route::middleware(['active.household', 'permission:household.members.manage'])->group(function () {
+        Route::post('/households/invitations', [HouseholdInvitationController::class, 'store'])->name('households.invitations.store');
+    });
+
+    // penerima buka link & accept/reject
+    Route::get('/invitations/{token}', [HouseholdInvitationController::class, 'show'])->name('invitations.show');
+    Route::post('/invitations/{token}/accept', [HouseholdInvitationController::class, 'accept'])->name('invitations.accept');
+    Route::post('/invitations/{token}/reject', [HouseholdInvitationController::class, 'reject'])->name('invitations.reject');
 });
 
 
