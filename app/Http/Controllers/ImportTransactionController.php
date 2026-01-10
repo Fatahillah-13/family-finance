@@ -9,6 +9,7 @@ use App\Models\TransactionImport;
 use App\Models\TransactionImportRow;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Services\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use illuminate\Support\Str;
@@ -389,6 +390,13 @@ class ImportTransactionController extends Controller
             $import->status = 'committed';
             $import->save();
         });
+
+        Audit::log($hid, $user, 'imports.commit', 'TransactionImport', $import->id, [
+            'created' => $created,
+            'skipped_duplicate' => $skippedDuplicate,
+            'skipped_error' => $skippedError,
+            'filename' => $import->original_filename,
+        ]);
 
         return redirect()->route('imports.preview', $import)
             ->with('status', "Import selesai. Created: {$created}, skipped duplicate: {$skippedDuplicate}, skipped error: {$skippedError}");

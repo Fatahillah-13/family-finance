@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Audit;
 use Illuminate\Http\Request;
 
 class RoleController extends Controller
@@ -41,10 +42,15 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'max:60'],
         ]);
 
-        Role::create([
+        $role = Role::create([
             'household_id' => $hid,
             'name' => $validated['name'],
             'is_active' => true,
+        ]);
+
+        Audit::log($hid, $user, 'roles.create', 'Role', $role->id, [
+            'name' => $role->name,
+            'is_active' => $role->is_active,
         ]);
 
         return redirect()->route('roles.index');
@@ -63,6 +69,10 @@ class RoleController extends Controller
 
         $role->update(['name' => $validated['name']]);
 
+        Audit::log($hid, $user, 'roles.update', 'Role', $role->id, [
+            'name' => $role->name,
+        ]);
+
         return back();
     }
 
@@ -80,6 +90,10 @@ class RoleController extends Controller
 
         $role->is_active = !$role->is_active;
         $role->save();
+
+        Audit::log($hid, $user, 'roles.toggle', 'Role', $role->id, [
+            'is_active' => $role->is_active,
+        ]);
 
         return back();
     }
@@ -104,6 +118,10 @@ class RoleController extends Controller
         ]);
 
         $role->permissions()->sync($validated['permissions'] ?? []);
+
+        Audit::log($hid, $user, 'roles.permissions.sync', 'Role', $role->id, [
+            'permissions' => $validated['permissions'] ?? [],
+        ]);
 
         return back();
     }

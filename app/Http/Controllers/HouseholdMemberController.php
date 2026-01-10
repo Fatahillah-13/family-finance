@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Household;
 use App\Models\HouseholdMembership;
 use App\Models\Role;
+use App\Services\Audit;
 use App\Models\User;
 
 class HouseholdMemberController extends Controller
@@ -64,10 +65,17 @@ class HouseholdMemberController extends Controller
                 ->onlyInput('email');
         }
 
-        HouseholdMembership::updateOrCreate(
+        $membership = HouseholdMembership::updateOrCreate(
             ['household_id' => $householdId, 'user_id' => $targetUser->id],
             ['role_id' => $role->id, 'status' => 'active']
         );
+
+        Audit::log($householdId, $actor, 'members.add', 'HouseholdMembership', $membership->id, [
+            'member_user_id' => $targetUser->id,
+            'member_email' => $targetUser->email,
+            'role_id' => $role->id,
+            'role_name' => $role->name,
+        ]);
 
         return redirect()->route('households.members');
     }
@@ -81,12 +89,24 @@ class HouseholdMemberController extends Controller
         abort_unless($householdId, 403);
         abort_unless($membership->household_id === $householdId, 403);
 
+        $membership->loadMissing(['user', 'role']);
+
         // Basic safety: jangan biarkan user menghapus dirinya sendiri lewat endpoint ini (opsional)
         if ($membership->user_id === $actor->id) {
             return back()->withErrors(['member' => 'Tidak bisa menghapus diri sendiri dari household aktif lewat menu ini.']);
         }
 
+        $meta = [
+            'member_user_id' => $membership->user_id,
+            'member_email' => $membership->user?->email,
+            'old_role_id' => $membership->role_id,
+            'old_role_name' => $membership->role?->name,
+        ];
+
+        $membershipId = $membership->id;
         $membership->delete();
+
+        Audit::log($householdId, $actor, 'members.remove', 'HouseholdMembership', $membershipId, $meta);
 
         return redirect()->route('households.members');
     }
@@ -104,19 +124,33 @@ class HouseholdMemberController extends Controller
             'role_id' => ['required', 'integer', 'exists:roles,id'],
         ]);
 
-        $role = Role::query()
+        $membership->loadMissing(['user', 'role']);
+
+        $newRole = Role::query()
             ->where('household_id', $hid)
             ->where('id', $validated['role_id'])
             ->where('is_active', true)
             ->firstOrFail();
 
         // Safety: jangan ubah role sendiri dari Owner -> lainnya (biar gak lockout)
-        if ($membership->user_id === $actor->id && $membership->role?->name === 'Owner' && $role->name !== 'Owner') {
+        if ($membership->user_id === $actor->id && $membership->role?->name === 'Owner' && $newRole->name !== 'Owner') {
             return back()->withErrors(['member' => 'Tidak boleh menurunkan role Owner untuk diri sendiri.']);
         }
 
-        $membership->role_id = $role->id;
+        $oldRoleId = $membership->role_id;
+        $oldRoleName = $membership->role?->name;
+
+        $membership->role_id = $newRole->id;
         $membership->save();
+
+        Audit::log($hid, $actor, 'members.role.update', 'HouseholdMembership', $membership->id, [
+            'member_user_id' => $membership->user_id,
+            'member_email' => $membership->user?->email,
+            'old_role_id' => $oldRoleId,
+            'old_role_name' => $oldRoleName,
+            'new_role_id' => $newRole->id,
+            'new_role_name' => $newRole->name,
+        ]);
 
         return back();
     }

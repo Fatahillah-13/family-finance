@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Models\TransactionAttachment;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Services\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -276,6 +277,11 @@ class TransactionController extends Controller
             }
         }
 
+        Audit::log($hid, $user, 'transactions.create', 'Transaction', $tx->id, [
+            'type' => $tx->type,
+            'amount' => $tx->amount,
+        ]);
+
         return redirect()->route('transactions.index');
     }
 
@@ -404,6 +410,10 @@ class TransactionController extends Controller
             }
         }
 
+        Audit::log($hid, $user, 'transactions.update', 'Transaction', $$transaction->id, [
+            'changes' => $transaction->getChanges(),
+        ]);
+
         return redirect()->route('transactions.index');
     }
 
@@ -415,6 +425,8 @@ class TransactionController extends Controller
         abort_unless($hid && $transaction->household_id === $hid, 403);
 
         $transaction->delete();
+
+        Audit::log($hid, $user, 'transactions.delete', 'Transaction', $transaction->id);
 
         return redirect()->route('transactions.index');
     }

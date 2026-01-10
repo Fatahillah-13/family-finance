@@ -12,9 +12,14 @@ use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ImportTransactionController;
+use App\Http\Controllers\AuditLogController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
+
+Route::middleware(['permission:audit.read'])->group(function () {
+    Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
+});
 
 Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

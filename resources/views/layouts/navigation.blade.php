@@ -51,6 +51,10 @@
                     <x-nav-link :href="route('imports.create')" :active="request()->routeIs('imports.*')">
                         {{ __('Import CSV') }}
                     </x-nav-link>
+
+                    <x-nav-link :href="route('audit.index')" :active="request()->routeIs('audit.*')">
+                        {{ __('Audit') }}
+                    </x-nav-link>
                 </div>
             </div>
 
