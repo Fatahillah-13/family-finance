@@ -1,3 +1,18 @@
+@php
+    /** @var \App\Models\User|null $u */
+    $u = Auth::user();
+
+    $canAccountsRead = $u?->hasPermission('accounts.read') ?? false;
+    $canCategoriesRead = $u?->hasPermission('categories.read') ?? false;
+    $canTagsRead = $u?->hasPermission('tags.read') ?? false;
+    $canImportCsv = $u?->hasPermission('transactions.create') ?? false;
+
+    $showMasterData = $canAccountsRead || $canCategoriesRead || $canTagsRead || $canImportCsv;
+
+    $canRolesManage = $u?->hasPermission('roles.manage') ?? false;
+    $canAuditRead = $u?->hasPermission('audit.read') ?? false;
+@endphp
+
 <nav x-data="{ open: false }" class="bg-white border-b border-gray-100">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -10,26 +25,10 @@
                     </a>
                 </div>
 
-                <!-- Navigation Links -->
+                <!-- Desktop Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('accounts.index')" :active="request()->routeIs('accounts.*')">
-                        {{ __('Accounts') }}
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('categories.index', ['type' => 'expense'])" :active="request()->routeIs('categories.*')">
-                        {{ __('Categories') }}
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('tags.index')" :active="request()->routeIs('tags.*')">
-                        {{ __('Tags') }}
-                    </x-nav-link>
-
-                    <x-nav-link :href="route('households.index')" :active="request()->routeIs('households.*')">
-                        {{ __('Households') }}
                     </x-nav-link>
 
                     <x-nav-link :href="route('transactions.index')" :active="request()->routeIs('transactions.*')">
@@ -44,33 +43,77 @@
                         {{ __('Reports') }}
                     </x-nav-link>
 
-                    <x-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
-                        {{ __('Roles') }}
-                    </x-nav-link>
+                    @if ($showMasterData)
+                        <div class="hidden sm:flex sm:items-center">
+                            <x-dropdown align="left" width="48">
+                                <x-slot name="trigger">
+                                    <button type="button"
+                                        class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out
+                                        {{ request()->routeIs('accounts.*') ||
+                                        request()->routeIs('categories.*') ||
+                                        request()->routeIs('tags.*') ||
+                                        request()->routeIs('imports.*')
+                                            ? 'border-indigo-400 text-gray-900 focus:outline-none focus:border-indigo-700'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300' }}">
+                                        <span>{{ __('Master Data') }}</span>
 
-                    <x-nav-link :href="route('imports.create')" :active="request()->routeIs('imports.*')">
-                        {{ __('Import CSV') }}
-                    </x-nav-link>
+                                        <svg class="ms-2 -me-0.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </x-slot>
 
-                    <x-nav-link :href="route('audit.index')" :active="request()->routeIs('audit.*')">
-                        {{ __('Audit') }}
-                    </x-nav-link>
+                                <x-slot name="content">
+                                    @if ($canAccountsRead)
+                                        <x-dropdown-link :href="route('accounts.index')" :active="request()->routeIs('accounts.*')">
+                                            {{ __('Accounts') }}
+                                        </x-dropdown-link>
+                                    @endif
+
+                                    @if ($canCategoriesRead)
+                                        <x-dropdown-link :href="route('categories.index')" :active="request()->routeIs('categories.*')">
+                                            {{ __('Categories') }}
+                                        </x-dropdown-link>
+                                    @endif
+
+                                    @if ($canTagsRead)
+                                        <x-dropdown-link :href="route('tags.index')" :active="request()->routeIs('tags.*')">
+                                            {{ __('Tags') }}
+                                        </x-dropdown-link>
+                                    @endif
+
+                                    @if ($canImportCsv)
+                                        @if ($canAccountsRead || $canCategoriesRead || $canTagsRead)
+                                            <div class="border-t border-gray-100 my-1"></div>
+                                        @endif
+
+                                        <x-dropdown-link :href="route('imports.create')" :active="request()->routeIs('imports.*')">
+                                            {{ __('Import CSV') }}
+                                        </x-dropdown-link>
+                                    @endif
+                                </x-slot>
+                            </x-dropdown>
+                        </div>
+                    @endif
                 </div>
             </div>
 
-            <!-- Settings Dropdown -->
+            <!-- User Dropdown (Desktop) -->
             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button
                             class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
-                            <div>{{ Auth::user()->name }}</div>
+                            <div>{{ $u?->name }}</div>
 
                             <div class="ms-1">
                                 <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg"
                                     viewBox="0 0 20 20">
                                     <path fill-rule="evenodd"
-                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                                         clip-rule="evenodd" />
                                 </svg>
                             </div>
@@ -78,17 +121,30 @@
                     </x-slot>
 
                     <x-slot name="content">
-                        <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
+                        <!-- Admin / Settings in user dropdown -->
+                        <x-dropdown-link :href="route('households.index')" :active="request()->routeIs('households.*')">
+                            {{ __('Households') }}
                         </x-dropdown-link>
+
+                        @if ($canRolesManage)
+                            <x-dropdown-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
+                                {{ __('Roles') }}
+                            </x-dropdown-link>
+                        @endif
+
+                        @if ($canAuditRead)
+                            <x-dropdown-link :href="route('audit.index')" :active="request()->routeIs('audit.*')">
+                                {{ __('Audit') }}
+                            </x-dropdown-link>
+                        @endif
+
+                        <div class="border-t border-gray-100 my-1"></div>
 
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-
                             <x-dropdown-link :href="route('logout')"
-                                onclick="event.preventDefault();
-                                                this.closest('form').submit();">
+                                onclick="event.preventDefault(); this.closest('form').submit();">
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
                         </form>
@@ -118,27 +174,76 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('transactions.index')" :active="request()->routeIs('transactions.*')">
+                {{ __('Transactions') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('budgets.index')" :active="request()->routeIs('budgets.*')">
+                {{ __('Budgets') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('reports.monthly')" :active="request()->routeIs('reports.*')">
+                {{ __('Reports') }}
+            </x-responsive-nav-link>
+
+            @if ($showMasterData)
+                <div class="px-4 pt-3 text-xs text-gray-500 uppercase tracking-wider">Master Data</div>
+
+                @if ($canAccountsRead)
+                    <x-responsive-nav-link :href="route('accounts.index')" :active="request()->routeIs('accounts.*')">
+                        {{ __('Accounts') }}
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($canCategoriesRead)
+                    <x-responsive-nav-link :href="route('categories.index')" :active="request()->routeIs('categories.*')">
+                        {{ __('Categories') }}
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($canTagsRead)
+                    <x-responsive-nav-link :href="route('tags.index')" :active="request()->routeIs('tags.*')">
+                        {{ __('Tags') }}
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($canImportCsv)
+                    <x-responsive-nav-link :href="route('imports.create')" :active="request()->routeIs('imports.*')">
+                        {{ __('Import CSV') }}
+                    </x-responsive-nav-link>
+                @endif
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
         <div class="pt-4 pb-1 border-t border-gray-200">
             <div class="px-4">
-                <div class="font-medium text-base text-gray-800">{{ Auth::user()->name }}</div>
-                <div class="font-medium text-sm text-gray-500">{{ Auth::user()->email }}</div>
+                <div class="font-medium text-base text-gray-800">{{ $u?->name }}</div>
+                <div class="font-medium text-sm text-gray-500">{{ $u?->email }}</div>
             </div>
 
             <div class="mt-3 space-y-1">
-                <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
+                <x-responsive-nav-link :href="route('households.index')" :active="request()->routeIs('households.*')">
+                    {{ __('Households') }}
                 </x-responsive-nav-link>
 
-                <!-- Authentication -->
+                @if ($canRolesManage)
+                    <x-responsive-nav-link :href="route('roles.index')" :active="request()->routeIs('roles.*')">
+                        {{ __('Roles') }}
+                    </x-responsive-nav-link>
+                @endif
+
+                @if ($canAuditRead)
+                    <x-responsive-nav-link :href="route('audit.index')" :active="request()->routeIs('audit.*')">
+                        {{ __('Audit') }}
+                    </x-responsive-nav-link>
+                @endif
+
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-
                     <x-responsive-nav-link :href="route('logout')"
-                        onclick="event.preventDefault();
-                                        this.closest('form').submit();">
+                        onclick="event.preventDefault(); this.closest('form').submit();">
                         {{ __('Log Out') }}
                     </x-responsive-nav-link>
                 </form>

@@ -17,9 +17,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
 
-Route::middleware(['permission:audit.read'])->group(function () {
-    Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
-});
 
 Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
@@ -116,6 +113,11 @@ Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
         Route::post('/imports/transactions', [ImportTransactionController::class, 'store'])->name('imports.store');
         Route::get('/imports/transactions/{import}/preview', [ImportTransactionController::class, 'preview'])->name('imports.preview');
         Route::post('/imports/transactions/{import}/commit', [ImportTransactionController::class, 'commit'])->name('imports.commit');
+    });
+
+    // Audit Logs
+    Route::middleware(['permission:audit.read'])->group(function () {
+        Route::get('/audit', [AuditLogController::class, 'index'])->name('audit.index');
     });
 });
 
