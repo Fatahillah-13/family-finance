@@ -11,6 +11,34 @@ const txList = document.getElementById("txList");
 const loadMoreBtn = document.getElementById("loadMoreBtn");
 const loadingEl = document.getElementById("loading");
 const monthLabel = document.getElementById("activeMonthLabel");
+const fabAddTx = document.getElementById("fabAddTx");
+
+function setFabLoading(isLoading) {
+    if (!fabAddTx) return;
+
+    if (isLoading) {
+        fabAddTx.classList.add("opacity-50", "pointer-events-none");
+        fabAddTx.setAttribute("aria-disabled", "true");
+        fabAddTx.setAttribute("tabindex", "-1");
+    } else {
+        fabAddTx.classList.remove("opacity-50", "pointer-events-none");
+        fabAddTx.removeAttribute("aria-disabled");
+        fabAddTx.removeAttribute("tabindex");
+    }
+}
+
+function updateFabLink() {
+    if (!fabAddTx) return;
+
+    // bikin URL dari href yang sudah ada (agar base path benar)
+    const url = new URL(fabAddTx.getAttribute("href"), window.location.origin);
+    url.searchParams.set("type", state.type);
+
+    fabAddTx.setAttribute(
+        "href",
+        url.pathname + "?" + url.searchParams.toString()
+    );
+}
 
 function formatIDR(amount) {
     return new Intl.NumberFormat("id-ID").format(amount);
@@ -24,6 +52,7 @@ function setLoading(isLoading) {
     state.loading = isLoading;
     loadingEl.classList.toggle("hidden", !isLoading);
     loadMoreBtn.disabled = isLoading;
+    setFabLoading(isLoading);
 }
 
 function txCard(tx) {
@@ -121,6 +150,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
             .querySelectorAll(".tab-btn")
             .forEach((b) => b.classList.remove("bg-gray-100"));
         btn.classList.add("bg-gray-100");
+        updateFabLink();
         resetAndLoad();
     });
 });
@@ -143,4 +173,5 @@ renderMonthLabel();
 document
     .querySelector('.tab-btn[data-type="expense"]')
     ?.classList.add("bg-gray-100");
+updateFabLink();
 resetAndLoad();

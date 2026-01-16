@@ -23,120 +23,89 @@ class TransactionController extends Controller
         $hid = $user->active_household_id;
         abort_unless($hid, 403);
 
-        // Filters
-        $type = $request->string('type')->toString();
-        $dateFrom = $request->string('date_from')->toString(); // YYYY-MM-DD
-        $dateTo = $request->string('date_to')->toString();     // YYYY-MM-DD
-        $accountId = $request->integer('account_id');
-        $categoryId = $request->integer('category_id');
-        $tagId = $request->integer('tag_id');
-        $q = trim($request->string('q')->toString());
+        return view('transactions.index');
+    }
+
+    public function data(Request $request)
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $hid = $user->active_household_id;
+        abort_unless($hid, 403);
+
+        $validated = $request->validate([
+            'type' => ['required', Rule::in(['income', 'expense', 'transfer'])],
+            'month' => ['nullable', 'date_format:Y-m'],
+            'q' => ['nullable', 'string', 'max:200'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $type = $validated['type'];
+        $month = $validated['month'] ?? now()->format('Y-m');
+        $q = $validated['q'] ?? null;
+
+        [$year, $mon] = explode('-', $month);
+        $from = Carbon::create((int) $year, (int) $mon, 1)->startOfDay();
+        $to = (clone $from)->endOfMonth()->endOfDay();
 
         $query = Transaction::query()
             ->where('transactions.household_id', $hid)
-            ->whereNull('transactions.deleted_at');
+            ->whereNull('transactions.deleted_at')
+            ->where('transactions.type', $type)
+            ->whereBetween('transactions.occurred_at', [$from, $to]);
 
-        // Type
-        if (in_array($type, ['income', 'expense', 'transfer'], true)) {
-            $query->where('transactions.type', $type);
-        }
-
-        // Date range (use occurred_at date)
-        if ($dateFrom !== '') {
-            $from = Carbon::parse($dateFrom)->startOfDay();
-            $query->where('transactions.occurred_at', '>=', $from);
-        }
-        if ($dateTo !== '') {
-            $to = Carbon::parse($dateTo)->endOfDay();
-            $query->where('transactions.occurred_at', '<=', $to);
-        }
-
-        // Account filter:
-        // - income/expense: match account_id
-        // - transfer: match from OR to
-        if ($accountId) {
-            $query->where(function ($qq) use ($accountId) {
-                $qq->where('transactions.account_id', $accountId)
-                    ->orWhere('transactions.from_account_id', $accountId)
-                    ->orWhere('transactions.to_account_id', $accountId);
-            });
-        }
-
-        // Category filter (income/expense only logically, but safe)
-        if ($categoryId) {
-            $query->where('transactions.category_id', $categoryId);
-        }
-
-        // Tag filter (exists on pivot)
-        if ($tagId) {
-            $query->whereExists(function ($sub) use ($tagId) {
-                $sub->selectRaw(1)
-                    ->from('transaction_tag')
-                    ->whereColumn('transaction_tag.transaction_id', 'transactions.id')
-                    ->where('transaction_tag.tag_id', $tagId);
-            });
-        }
-
-        // Search (description + account + category + transfer accounts)
         if ($q !== '') {
-            // join for searching names
-            $query
-                ->leftJoin('accounts as a', 'a.id', '=', 'transactions.account_id')
-                ->leftJoin('categories as c', 'c.id', '=', 'transactions.category_id')
-                ->leftJoin('accounts as fa', 'fa.id', '=', 'transactions.from_account_id')
-                ->leftJoin('accounts as ta', 'ta.id', '=', 'transactions.to_account_id')
-                ->where(function ($qq) use ($q) {
-                    $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
-                    $qq->where('transactions.description', 'like', $like)
-                        ->orWhere('a.name', 'like', $like)
-                        ->orWhere('c.name', 'like', $like)
-                        ->orWhere('fa.name', 'like', $like)
-                        ->orWhere('ta.name', 'like', $like);
-                })
-                ->select('transactions.*'); // important to avoid selecting joined columns into model
+            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+            $query->where('transactions.description', 'like', $like);
         }
 
-        // Eager-load relations for display
+        // Eager load untuk tampilan card
         $query->with(['account', 'category', 'fromAccount', 'toAccount', 'tags']);
 
-        $transactions = $query
+        $perPage = 20;
+        $paginator = $query
             ->orderByDesc('transactions.occurred_at')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
-        // Dropdown data
-        $accounts = Account::query()
-            ->where('household_id', $hid)
-            ->orderByDesc('is_active')
-            ->orderBy('name')
-            ->get();
+        $items = $paginator->getCollection()->map(function (Transaction $tx) {
+            return [
+                'id' => $tx->id,
+                'type' => $tx->type,
+                'occurred_at' => optional($tx->occurred_at)->format('Y-m-d H:i'),
+                'amount' => (int) $tx->amount,
+                'description' => $tx->description,
 
-        $categories = Category::query()
-            ->where('household_id', $hid)
-            ->orderBy('type')
-            ->orderBy('name')
-            ->get();
+                'category' => $tx->category ? [
+                    'id' => $tx->category->id,
+                    'name' => $tx->category->name,
+                ] : null,
 
-        $tags = Tag::query()
-            ->where('household_id', $hid)
-            ->orderBy('name')
-            ->get();
+                // income/expense
+                'account' => $tx->account ? [
+                    'id' => $tx->account->id,
+                    'name' => $tx->account->name,
+                ] : null,
 
-        return view('transactions.index', [
-            'transactions' => $transactions,
-            'accounts' => $accounts,
-            'categories' => $categories,
-            'tags' => $tags,
+                // transfer
+                'from_account' => $tx->fromAccount ? [
+                    'id' => $tx->fromAccount->id,
+                    'name' => $tx->fromAccount->name,
+                ] : null,
+                'to_account' => $tx->toAccount ? [
+                    'id' => $tx->toAccount->id,
+                    'name' => $tx->toAccount->name,
+                ] : null,
+            ];
+        })->values();
 
-            // current filters (for form values)
-            'f' => [
-                'type' => $type,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-                'account_id' => $accountId,
-                'category_id' => $categoryId,
-                'tag_id' => $tagId,
-                'q' => $q,
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'month' => $month,
+                'current_page' => $paginator->currentPage(),
+                'has_more' => $paginator->hasMorePages(),
+                'next_page' => $paginator->hasMorePages() ? $paginator->currentPage() + 1 : null,
             ],
         ]);
     }
@@ -461,69 +430,5 @@ class TransactionController extends Controller
         $attachment->delete();
 
         return back();
-    }
-
-    public function data(Request $request)
-    {
-        /** @var User $user */
-        $user = $request->user();
-        $hid = $user->active_household_id;
-        abort_unless($hid, 403);
-
-        $validated = $request->validate([
-            'type' => ['required', Rule::in(['income', 'expense', 'transfer'])],
-            'month' => ['nullable', 'date_format:Y-m'],
-            'q' => ['nullable', 'string', 'max:200'],
-            'page' => ['nullable', 'integer', 'min:1'],
-        ]);
-
-        $type = $validated['type'];
-        $month = $validated['month'] ?? now()->format('Y-m');
-        $q = $validated['q'] ?? null;
-
-        [$year, $mon] = explode('-', $month);
-        $from = now()->setDate((int)$year, (int)$mon, 1)->startOfDay();
-        $to = (clone $from)->endOfMonth()->endOfDay();
-
-        $query = Transaction::query()
-            ->with([
-                'category:id,name',
-                'account:id,name',
-                // kalau transfer ada relasi fromAccount/toAccount, bisa ditambah belakangan
-            ])
-            ->where('household_id', $hid)
-            ->where('type', $type)
-            ->whereBetween('occurred_at', [$from, $to])
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id');
-
-        if ($q) {
-            $query->where('description', 'like', '%' . $q . '%');
-        }
-
-        $perPage = 20;
-        $paginator = $query->paginate($perPage)->appends($request->query());
-
-        // bentuk payload ringkas agar frontend gampang render
-        $items = $paginator->getCollection()->map(function ($tx) {
-            return [
-                'id' => $tx->id,
-                'type' => $tx->type,
-                'occurred_at' => $tx->occurred_at?->format('Y-m-d H:i:s'),
-                'amount' => (int) $tx->amount,
-                'description' => $tx->description,
-                'category' => $tx->category ? ['id' => $tx->category->id, 'name' => $tx->category->name] : null,
-                'account' => $tx->account ? ['id' => $tx->account->id, 'name' => $tx->account->name] : null,
-            ];
-        })->values();
-
-        return response()->json([
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'has_more' => $paginator->hasMorePages(),
-                'next_page' => $paginator->hasMorePages() ? $paginator->currentPage() + 1 : null,
-            ],
-        ]);
     }
 }

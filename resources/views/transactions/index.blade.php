@@ -38,6 +38,15 @@
         </div>
     </div>
 
+    {{-- Floating Action Button: Add Transaction (mobile friendly) --}}
+    <a id="fabAddTx" href="{{ route('transactions.create', ['type' => 'expense']) }}"
+        class="fixed bottom-6 right-6 z-50 inline-flex items-center justify-center w-14 h-14 rounded-full
+          bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2
+          focus:ring-indigo-500 focus:ring-offset-2 transition-opacity"
+        aria-label="Add transaction">
+        <span class="text-2xl leading-none">+</span>
+    </a>
+
     <script>
         window.TRANSACTIONS_DATA_URL = @json(route('transactions.data'));
         window.CSRF_TOKEN = @json(csrf_token());
