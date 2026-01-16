@@ -80,6 +80,23 @@ function setLoading(isLoading) {
     setFabLoading(isLoading);
 }
 
+function emptyStateCard() {
+    return `
+    <div class="bg-white shadow-sm rounded-lg p-6 text-center">
+      <div class="text-gray-900 font-semibold">Belum ada transaksi</div>
+      <div class="mt-1 text-sm text-gray-600">
+        Tidak ada transaksi untuk periode ini. Silakan tambah transaksi baru.
+      </div>
+      <div class="mt-4">
+        <a href="${fabAddTx?.getAttribute("href") ?? "#"}"
+           class="inline-flex items-center px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">
+          + Tambah transaksi
+        </a>
+      </div>
+    </div>
+  `;
+}
+
 function txCard(tx) {
     const amountColor =
         tx.type === "income"
@@ -152,7 +169,19 @@ async function loadTransactions({ reset = false } = {}) {
         }
 
         const json = await res.json();
-        renderTransactions(json.data, reset);
+
+        if (reset) {
+            txList.innerHTML = "";
+
+            if (!json.data || json.data.length === 0) {
+                txList.insertAdjacentHTML("beforeend", emptyStateCard());
+                state.hasMore = false;
+                loadMoreBtn?.classList.add("hidden");
+                return;
+            }
+        }
+
+        renderTransactions(json.data, false);
 
         state.hasMore = !!json.meta?.has_more;
         loadMoreBtn?.classList.toggle("hidden", !state.hasMore);
