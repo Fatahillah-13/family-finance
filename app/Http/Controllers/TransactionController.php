@@ -410,7 +410,7 @@ class TransactionController extends Controller
             }
         }
 
-        Audit::log($hid, $user, 'transactions.update', 'Transaction', $$transaction->id, [
+        Audit::log($hid, $user, 'transactions.update', 'Transaction', $transaction->id, [
             'changes' => $transaction->getChanges(),
         ]);
 
@@ -461,5 +461,69 @@ class TransactionController extends Controller
         $attachment->delete();
 
         return back();
+    }
+
+    public function data(Request $request)
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $hid = $user->active_household_id;
+        abort_unless($hid, 403);
+
+        $validated = $request->validate([
+            'type' => ['required', Rule::in(['income', 'expense', 'transfer'])],
+            'month' => ['nullable', 'date_format:Y-m'],
+            'q' => ['nullable', 'string', 'max:200'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $type = $validated['type'];
+        $month = $validated['month'] ?? now()->format('Y-m');
+        $q = $validated['q'] ?? null;
+
+        [$year, $mon] = explode('-', $month);
+        $from = now()->setDate((int)$year, (int)$mon, 1)->startOfDay();
+        $to = (clone $from)->endOfMonth()->endOfDay();
+
+        $query = Transaction::query()
+            ->with([
+                'category:id,name',
+                'account:id,name',
+                // kalau transfer ada relasi fromAccount/toAccount, bisa ditambah belakangan
+            ])
+            ->where('household_id', $hid)
+            ->where('type', $type)
+            ->whereBetween('occurred_at', [$from, $to])
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
+
+        if ($q) {
+            $query->where('description', 'like', '%' . $q . '%');
+        }
+
+        $perPage = 20;
+        $paginator = $query->paginate($perPage)->appends($request->query());
+
+        // bentuk payload ringkas agar frontend gampang render
+        $items = $paginator->getCollection()->map(function ($tx) {
+            return [
+                'id' => $tx->id,
+                'type' => $tx->type,
+                'occurred_at' => $tx->occurred_at?->format('Y-m-d H:i:s'),
+                'amount' => (int) $tx->amount,
+                'description' => $tx->description,
+                'category' => $tx->category ? ['id' => $tx->category->id, 'name' => $tx->category->name] : null,
+                'account' => $tx->account ? ['id' => $tx->account->id, 'name' => $tx->account->name] : null,
+            ];
+        })->values();
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'has_more' => $paginator->hasMorePages(),
+                'next_page' => $paginator->hasMorePages() ? $paginator->currentPage() + 1 : null,
+            ],
+        ]);
     }
 }

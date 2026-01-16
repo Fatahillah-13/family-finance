@@ -76,6 +76,8 @@ Route::middleware(['auth', 'verified', 'active.household'])->group(function () {
     // Transactions
     Route::middleware(['permission:transactions.read'])->group(function () {
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        // JSON endpoint untuk AJAX
+        Route::get('/transactions/data', [TransactionController::class, 'data'])->name('transactions.data');
     });
 
     Route::middleware(['permission:transactions.create'])->group(function () {
