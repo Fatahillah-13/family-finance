@@ -80,6 +80,33 @@ function setLoading(isLoading) {
     setFabLoading(isLoading);
 }
 
+function skeletonCard() {
+    return `
+    <div class="bg-white shadow-sm rounded-lg p-4 animate-pulse">
+      <div class="flex justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+          <div class="mt-2 h-3 bg-gray-200 rounded w-2/3"></div>
+        </div>
+        <div class="h-4 bg-gray-200 rounded w-24"></div>
+      </div>
+      <div class="mt-3 flex justify-between">
+        <div class="h-3 bg-gray-200 rounded w-28"></div>
+        <div class="h-3 bg-gray-200 rounded w-20"></div>
+      </div>
+    </div>
+  `;
+}
+
+function showSkeleton(count = 3) {
+    // hanya untuk load pertama/reset (biar nggak ganggu "load more" append)
+    txList.innerHTML = Array.from({ length: count }, skeletonCard).join("");
+}
+
+function hideSkeleton() {
+    // tidak perlu apa-apa spesifik; konten list akan di-replace oleh render transaksi/empty state
+}
+
 function emptyStateCard() {
     return `
     <div class="bg-white shadow-sm rounded-lg p-6 text-center">
@@ -146,6 +173,8 @@ function renderTransactions(items, reset = false) {
 async function loadTransactions({ reset = false } = {}) {
     if (state.loading) return;
 
+    if (reset) showSkeleton(3);
+
     setLoading(true);
 
     const params = new URLSearchParams({
@@ -170,18 +199,17 @@ async function loadTransactions({ reset = false } = {}) {
 
         const json = await res.json();
 
-        if (reset) {
+        if (!json.data || json.data.length === 0) {
+            // reset tampilan + empty state
             txList.innerHTML = "";
-
-            if (!json.data || json.data.length === 0) {
-                txList.insertAdjacentHTML("beforeend", emptyStateCard());
-                state.hasMore = false;
-                loadMoreBtn?.classList.add("hidden");
-                return;
-            }
+            txList.insertAdjacentHTML("beforeend", emptyStateCard());
+            state.hasMore = false;
+            loadMoreBtn?.classList.add("hidden");
+            return;
         }
 
-        renderTransactions(json.data, false);
+        // render data
+        renderTransactions(json.data, reset);
 
         state.hasMore = !!json.meta?.has_more;
         loadMoreBtn?.classList.toggle("hidden", !state.hasMore);
