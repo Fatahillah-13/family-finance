@@ -13,6 +13,34 @@ const loadingEl = document.getElementById("loading");
 const monthLabel = document.getElementById("activeMonthLabel");
 const fabAddTx = document.getElementById("fabAddTx");
 
+function debounce(fn, delay = 400) {
+    let t = null;
+    return (...args) => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
+    };
+}
+
+const debouncedSearch = debounce(() => {
+    // optional: jangan auto-search kalau lagi loading
+    if (state.loading) return;
+    applySearchFromInput();
+}, 400);
+
+document.getElementById("q")?.addEventListener("input", () => {
+    debouncedSearch();
+});
+
+function applySearchFromInput() {
+    const nextQ = document.getElementById("q")?.value?.trim() ?? "";
+
+    // kalau tidak berubah, jangan reload (menghemat request)
+    if (nextQ === (state.q ?? "")) return;
+
+    state.q = nextQ;
+    resetAndLoad();
+}
+
 function addMonths(yyyyMm, delta) {
     const [y, m] = yyyyMm.split("-").map(Number); // m: 1..12
     const d = new Date(y, m - 1, 1);
@@ -286,8 +314,14 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 
 // Search
 document.getElementById("searchBtn")?.addEventListener("click", () => {
-    state.q = document.getElementById("q")?.value?.trim() ?? "";
-    resetAndLoad();
+    applySearchFromInput();
+});
+
+document.getElementById("q")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        applySearchFromInput();
+    }
 });
 
 // Load more
