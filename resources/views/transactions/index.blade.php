@@ -2,7 +2,19 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Transactions</h2>
-            <div class="text-sm text-gray-600" id="activeMonthLabel"></div>
+            <div class="flex items-center gap-2">
+                <button id="prevMonthBtn" class="px-2 py-1 border rounded bg-white hover:bg-gray-50" type="button"
+                    aria-label="Previous month">
+                    ‹
+                </button>
+
+                <div class="text-sm text-gray-600 w-[80px] text-center" id="activeMonthLabel"></div>
+
+                <button id="nextMonthBtn" class="px-2 py-1 border rounded bg-white hover:bg-gray-50" type="button"
+                    aria-label="Next month">
+                    ›
+                </button>
+            </div>
         </div>
     </x-slot>
 

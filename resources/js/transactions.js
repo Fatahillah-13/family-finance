@@ -13,6 +13,16 @@ const loadingEl = document.getElementById("loading");
 const monthLabel = document.getElementById("activeMonthLabel");
 const fabAddTx = document.getElementById("fabAddTx");
 
+function addMonths(yyyyMm, delta) {
+    const [y, m] = yyyyMm.split("-").map(Number); // m: 1..12
+    const d = new Date(y, m - 1, 1);
+    d.setMonth(d.getMonth() + delta);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+}
+
 function setFabLoading(isLoading) {
     if (!fabAddTx) return;
 
@@ -30,7 +40,6 @@ function setFabLoading(isLoading) {
 function updateFabLink() {
     if (!fabAddTx) return;
 
-    // bikin URL dari href yang sudah ada (agar base path benar)
     const url = new URL(fabAddTx.getAttribute("href"), window.location.origin);
     url.searchParams.set("type", state.type);
 
@@ -45,13 +54,29 @@ function formatIDR(amount) {
 }
 
 function renderMonthLabel() {
-    monthLabel.textContent = state.month;
+    const [y, m] = state.month.split("-").map(Number);
+    const d = new Date(y, m - 1, 1);
+    if (monthLabel) {
+        monthLabel.textContent = d.toLocaleString("id-ID", {
+            month: "short",
+            year: "numeric",
+        });
+    }
+}
+
+function highlightActiveTab() {
+    document
+        .querySelectorAll(".tab-btn")
+        .forEach((b) => b.classList.remove("bg-gray-100"));
+    document
+        .querySelector(`.tab-btn[data-type="${state.type}"]`)
+        ?.classList.add("bg-gray-100");
 }
 
 function setLoading(isLoading) {
     state.loading = isLoading;
-    loadingEl.classList.toggle("hidden", !isLoading);
-    loadMoreBtn.disabled = isLoading;
+    loadingEl?.classList.toggle("hidden", !isLoading);
+    if (loadMoreBtn) loadMoreBtn.disabled = isLoading;
     setFabLoading(isLoading);
 }
 
@@ -61,14 +86,17 @@ function txCard(tx) {
             ? "text-green-700"
             : tx.type === "expense"
             ? "text-red-700"
-            : "text-gray-800";
+            : "text-gray-700";
 
     const title =
         tx.type === "transfer"
-            ? "Transfer"
+            ? `${tx.from_account?.name ?? "From"} → ${
+                  tx.to_account?.name ?? "To"
+              }`
             : tx.category?.name ?? "Uncategorized";
 
-    const accountText = tx.type === "transfer" ? "" : tx.account?.name ?? "";
+    const accountText =
+        tx.type === "transfer" ? "Transfer" : tx.account?.name ?? "";
 
     return `
     <div class="bg-white shadow-sm rounded-lg p-4">
@@ -127,7 +155,7 @@ async function loadTransactions({ reset = false } = {}) {
         renderTransactions(json.data, reset);
 
         state.hasMore = !!json.meta?.has_more;
-        loadMoreBtn.classList.toggle("hidden", !state.hasMore);
+        loadMoreBtn?.classList.toggle("hidden", !state.hasMore);
     } catch (e) {
         console.error(e);
         alert("Failed to load transactions. Check console/log.");
@@ -136,21 +164,65 @@ async function loadTransactions({ reset = false } = {}) {
     }
 }
 
+function initStateFromUrl() {
+    const url = new URL(window.location.href);
+
+    const type = url.searchParams.get("type");
+    const month = url.searchParams.get("month");
+    const q = url.searchParams.get("q");
+
+    if (["expense", "income", "transfer"].includes(type)) {
+        state.type = type;
+    }
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+        state.month = month;
+    }
+    if (typeof q === "string") {
+        state.q = q;
+        const qInput = document.getElementById("q");
+        if (qInput) qInput.value = q;
+    }
+}
+
+function syncUrl() {
+    const url = new URL(window.location.href);
+
+    url.searchParams.set("type", state.type);
+    url.searchParams.set("month", state.month);
+
+    const qTrim = (state.q ?? "").trim();
+    if (qTrim) url.searchParams.set("q", qTrim);
+    else url.searchParams.delete("q");
+
+    window.history.replaceState({}, "", url);
+}
+
 function resetAndLoad() {
     state.page = 1;
+    syncUrl();
     renderMonthLabel();
+    highlightActiveTab();
+    updateFabLink();
     loadTransactions({ reset: true });
 }
+
+// Month switcher
+document.getElementById("prevMonthBtn")?.addEventListener("click", () => {
+    if (state.loading) return;
+    state.month = addMonths(state.month, -1);
+    resetAndLoad();
+});
+
+document.getElementById("nextMonthBtn")?.addEventListener("click", () => {
+    if (state.loading) return;
+    state.month = addMonths(state.month, 1);
+    resetAndLoad();
+});
 
 // Tabs
 document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
         state.type = btn.dataset.type;
-        document
-            .querySelectorAll(".tab-btn")
-            .forEach((b) => b.classList.remove("bg-gray-100"));
-        btn.classList.add("bg-gray-100");
-        updateFabLink();
         resetAndLoad();
     });
 });
@@ -162,16 +234,12 @@ document.getElementById("searchBtn")?.addEventListener("click", () => {
 });
 
 // Load more
-loadMoreBtn.addEventListener("click", () => {
+loadMoreBtn?.addEventListener("click", () => {
     if (!state.hasMore) return;
     state.page += 1;
     loadTransactions({ reset: false });
 });
 
 // initial
-renderMonthLabel();
-document
-    .querySelector('.tab-btn[data-type="expense"]')
-    ?.classList.add("bg-gray-100");
-updateFabLink();
+initStateFromUrl();
 resetAndLoad();
