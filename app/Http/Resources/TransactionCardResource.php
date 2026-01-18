@@ -16,25 +16,29 @@ class TransactionCardResource extends JsonResource
             'amount' => (int) $this->amount,
             'description' => $this->description,
 
-            'category' => $this->whenLoaded('category', fn() => $this->category && [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-            ]),
+            'category' => $this->whenLoaded('category', function () {
+                return $this->category
+                    ? ['id' => $this->category->id, 'name' => $this->category->name]
+                    : null;
+            }),
 
-            'account' => $this->whenLoaded('account', fn() => $this->account && [
-                'id' => $this->account->id,
-                'name' => $this->account->name,
-            ]),
+            'account' => $this->whenLoaded('account', function () {
+                return $this->account
+                    ? ['id' => $this->account->id, 'name' => $this->account->name]
+                    : null;
+            }),
 
-            'from_account' => $this->whenLoaded('fromAccount', fn() => $this->fromAccount && [
-                'id' => $this->fromAccount->id,
-                'name' => $this->fromAccount->name,
-            ]),
+            'from_account' => $this->whenLoaded('fromAccount', function () {
+                return $this->fromAccount
+                    ? ['id' => $this->fromAccount->id, 'name' => $this->fromAccount->name]
+                    : null;
+            }),
 
-            'to_account' => $this->whenLoaded('toAccount', fn() => $this->toAccount && [
-                'id' => $this->toAccount->id,
-                'name' => $this->toAccount->name,
-            ]),
+            'to_account' => $this->whenLoaded('toAccount', function () {
+                return $this->toAccount
+                    ? ['id' => $this->toAccount->id, 'name' => $this->toAccount->name]
+                    : null;
+            }),
         ];
     }
 }

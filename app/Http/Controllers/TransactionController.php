@@ -84,7 +84,7 @@ class TransactionController extends Controller
             ->paginate($perPage);
 
         return response()->json([
-            'data' => TransactionCardResource::collection($paginator->getCollection()),
+            'data' => TransactionCardResource::collection($paginator->getCollection())->resolve(),
             'meta' => [
                 'month' => $month,
                 'current_page' => $paginator->currentPage(),
