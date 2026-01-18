@@ -13,6 +13,7 @@ use App\Services\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use App\Http\Resources\TransactionCardResource;
 
 class TransactionController extends Controller
 {
@@ -82,39 +83,8 @@ class TransactionController extends Controller
             ->orderByDesc('transactions.occurred_at')
             ->paginate($perPage);
 
-        $items = $paginator->getCollection()->map(function (Transaction $tx) {
-            return [
-                'id' => $tx->id,
-                'type' => $tx->type,
-                'occurred_at' => optional($tx->occurred_at)->format('Y-m-d H:i'),
-                'amount' => (int) $tx->amount,
-                'description' => $tx->description,
-
-                'category' => $tx->category ? [
-                    'id' => $tx->category->id,
-                    'name' => $tx->category->name,
-                ] : null,
-
-                // income/expense
-                'account' => $tx->account ? [
-                    'id' => $tx->account->id,
-                    'name' => $tx->account->name,
-                ] : null,
-
-                // transfer
-                'from_account' => $tx->fromAccount ? [
-                    'id' => $tx->fromAccount->id,
-                    'name' => $tx->fromAccount->name,
-                ] : null,
-                'to_account' => $tx->toAccount ? [
-                    'id' => $tx->toAccount->id,
-                    'name' => $tx->toAccount->name,
-                ] : null,
-            ];
-        })->values();
-
         return response()->json([
-            'data' => $items,
+            'data' => TransactionCardResource::collection($paginator->getCollection()),
             'meta' => [
                 'month' => $month,
                 'current_page' => $paginator->currentPage(),
