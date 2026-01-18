@@ -50,23 +50,37 @@ class TransactionController extends Controller
 
         $query = Transaction::query()
             ->where('transactions.household_id', $hid)
-            ->whereNull('transactions.deleted_at')
             ->where('transactions.type', $type)
-            ->whereBetween('transactions.occurred_at', [$from, $to]);
+            ->whereBetween('transactions.occurred_at', [$from, $to])
+            ->select([
+                'transactions.id',
+                'transactions.type',
+                'transactions.occurred_at',
+                'transactions.amount',
+                'transactions.description',
+                'transactions.account_id',
+                'transactions.category_id',
+                'transactions.from_account_id',
+                'transactions.to_account_id',
+            ])
+            // Eager load untuk tampilan card (ambil kolom minimal)
+            ->with([
+                'account:id,name',
+                'category:id,name',
+                'fromAccount:id,name',
+                'toAccount:id,name',
+            ]);
 
-        if ($q !== '') {
-            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+        // Search: jangan sampai null/blank berubah jadi LIKE "%%"
+        if (!blank($q)) {
+            $like = '%' . addcslashes($q, '%_\\') . '%';
             $query->where('transactions.description', 'like', $like);
         }
-
-        // Eager load untuk tampilan card
-        $query->with(['account', 'category', 'fromAccount', 'toAccount', 'tags']);
 
         $perPage = 20;
         $paginator = $query
             ->orderByDesc('transactions.occurred_at')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->paginate($perPage);
 
         $items = $paginator->getCollection()->map(function (Transaction $tx) {
             return [
