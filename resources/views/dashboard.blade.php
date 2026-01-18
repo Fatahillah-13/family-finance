@@ -4,13 +4,63 @@
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Dashboard — {{ $monthLabel }}
             </h2>
-            <div class="flex gap-3 text-sm">
-                <a class="underline" href="{{ route('transactions.create', ['type' => 'expense']) }}">+ Expense</a>
-                <a class="underline" href="{{ route('transactions.create', ['type' => 'income']) }}">+ Income</a>
-                <a class="underline" href="{{ route('transactions.create', ['type' => 'transfer']) }}">+ Transfer</a>
+            <div class="hidden sm:flex gap-3 text-sm">
+                <div class="relative" x-data="{ open: false }">
+                    <button type="button" @click="open = !open" @keydown.escape.window="open = false"
+                        class="inline-flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+                        aria-haspopup="menu" :aria-expanded="open.toString()">
+                        <span>+ Add</span>
+                        <svg class="h-4 w-4 opacity-80" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08Z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <div x-cloak x-show="open" @click.outside="open = false" x-transition
+                        class="absolute right-0 z-50 mt-2 w-48 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+                        role="menu" aria-label="Add transaction">
+                        <a class="block px-4 py-2 text-sm hover:bg-gray-50" role="menuitem"
+                            href="{{ route('transactions.create', ['type' => 'expense']) }}">
+                            + Expense
+                        </a>
+                        <a class="block px-4 py-2 text-sm hover:bg-gray-50" role="menuitem"
+                            href="{{ route('transactions.create', ['type' => 'income']) }}">
+                            + Income
+                        </a>
+                        <a class="block px-4 py-2 text-sm hover:bg-gray-50" role="menuitem"
+                            href="{{ route('transactions.create', ['type' => 'transfer']) }}">
+                            + Transfer
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </x-slot>
+
+    <div class="fixed bottom-5 right-5 z-50 sm:hidden" x-data="{ open: false }">
+        <button type="button" @click="open = !open"
+            class="h-14 w-14 rounded-full bg-gray-900 text-white shadow-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+            aria-label="Add transaction">
+            <span class="text-2xl leading-none">+</span>
+        </button>
+
+        <div x-cloak x-show="open" x-transition @click.outside="open = false"
+            class="absolute bottom-16 right-0 w-52 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+            <a class="block px-4 py-3 text-sm hover:bg-gray-50"
+                href="{{ route('transactions.create', ['type' => 'expense']) }}">
+                + Expense
+            </a>
+            <a class="block px-4 py-3 text-sm hover:bg-gray-50"
+                href="{{ route('transactions.create', ['type' => 'income']) }}">
+                + Income
+            </a>
+            <a class="block px-4 py-3 text-sm hover:bg-gray-50"
+                href="{{ route('transactions.create', ['type' => 'transfer']) }}">
+                + Transfer
+            </a>
+        </div>
+    </div>
 
     <div class="py-8">
         <div class="max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
