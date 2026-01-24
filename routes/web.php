@@ -15,6 +15,7 @@ use App\Http\Controllers\ImportTransactionController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\HouseholdInvitationController;
+use App\Http\Controllers\ReceiptScanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
@@ -160,6 +161,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/invitations/{token}', [HouseholdInvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}/accept', [HouseholdInvitationController::class, 'accept'])->name('invitations.accept');
     Route::post('/invitations/{token}/reject', [HouseholdInvitationController::class, 'reject'])->name('invitations.reject');
+
+    Route::post('/transactions/scan-receipt', ReceiptScanController::class)
+        ->name('transactions.scan-receipt');
 });
 
 

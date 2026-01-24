@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TransactionAttachment extends Model
 {
+    protected $table = 'transaction_attachments';
+
     protected $fillable = [
         'transaction_id',
         'disk',

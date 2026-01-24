@@ -227,6 +227,17 @@ class TransactionController extends Controller
                     'size' => $file->getSize(),
                     'uploaded_by' => $user->id,
                 ]);
+
+                // setelah $transaction = Transaction::create(...)
+                $attachmentId = $request->input('attachment_id');
+
+                if ($attachmentId) {
+                    TransactionAttachment::query()
+                        ->where('id', $attachmentId)
+                        ->whereNull('transaction_id')
+                        ->where('uploaded_by', $user->id)
+                        ->update(['transaction_id' => $tx->id]);
+                }
             }
         }
 

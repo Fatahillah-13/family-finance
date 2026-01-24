@@ -41,4 +41,14 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'google_vision' => [
+        'project' => env('GOOGLE_CLOUD_PROJECT'),
+        'key' => env('GOOGLE_CLOUD_VISION_API_KEY'),
+    ],
+
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+    ],
+
 ];

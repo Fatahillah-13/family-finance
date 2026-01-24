@@ -32,6 +32,103 @@
                             <x-input-error :messages="$errors->get('amount')" class="mt-2" />
                         </div>
 
+                        {{-- tampilkan hanya untuk expense --}}
+                        @if (request('type') === 'expense')
+                            <div class="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold">Scan Struk</div>
+                                        <div class="text-sm text-gray-600">Upload foto struk untuk mengisi otomatis
+                                            tanggal, total, dan deskripsi.</div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2">
+                                        <input id="receipt_image" type="file" accept="image/*" class="text-sm" />
+                                        <button id="scan_receipt_btn" type="button"
+                                            class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800">
+                                            Scan
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="scan_receipt_status" class="mt-3 text-sm text-gray-600 hidden"></div>
+                            </div>
+
+                            <input type="hidden" name="attachment_id" id="attachment_id" value="" />
+                        @endif
+
+                        @push('scripts')
+                            <script>
+                                document.addEventListener('DOMContentLoaded', () => {
+                                    const btn = document.getElementById('scan_receipt_btn');
+                                    if (!btn) return;
+
+                                    const input = document.getElementById('receipt_image');
+                                    const statusEl = document.getElementById('scan_receipt_status');
+
+                                    // Sesuaikan ID field form Anda:
+                                    const occurredAtEl = document.querySelector('[name="occurred_at"]');
+                                    const amountEl = document.querySelector('[name="amount"]');
+                                    const descEl = document.querySelector('[name="description"]');
+                                    const attachmentIdEl = document.getElementById('attachment_id');
+
+                                    const setStatus = (text) => {
+                                        statusEl.classList.remove('hidden');
+                                        statusEl.textContent = text;
+                                    };
+
+                                    btn.addEventListener('click', async () => {
+                                        if (!input.files || !input.files[0]) {
+                                            setStatus('Pilih gambar struk dulu.');
+                                            return;
+                                        }
+
+                                        btn.disabled = true;
+                                        setStatus('Memproses struk...');
+
+                                        const fd = new FormData();
+                                        fd.append('receipt_image', input.files[0]);
+                                        fd.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+                                        try {
+                                            const res = await fetch('{{ route('transactions.scan-receipt') }}', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                                        .getAttribute('content'),
+                                                    'Accept': 'application/json',
+                                                },
+                                                body: fd,
+                                            });
+
+                                            const data = await res.json();
+                                            if (!res.ok) {
+                                                setStatus(data.message || 'Gagal scan struk.');
+                                                btn.disabled = false;
+                                                return;
+                                            }
+
+                                            if (attachmentIdEl) attachmentIdEl.value = data.attachment_id || '';
+
+                                            if (data.prefill) {
+                                                if (occurredAtEl && data.prefill.occurred_at) occurredAtEl.value = data.prefill
+                                                    .occurred_at;
+                                                if (amountEl && data.prefill.amount != null) amountEl.value = data.prefill
+                                                    .amount;
+                                                if (descEl && data.prefill.description) descEl.value = data.prefill.description;
+                                            }
+
+                                            setStatus('Berhasil. Silakan cek kembali data lalu simpan transaksi.');
+                                        } catch (e) {
+                                            setStatus('Terjadi error saat memproses. Coba lagi.');
+                                        } finally {
+                                            btn.disabled = false;
+                                        }
+                                    });
+                                });
+                            </script>
+                        @endpush
+
                         @if ($type === 'transfer')
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
