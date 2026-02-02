@@ -1,0 +1,4 @@
+deployment:
+tasks:
+  - export DEPLOYPATH=/home/usercpanel/public_html/cashflowapp.ambardi-family.my.id/git
+  - /bin/cp -r * $DEPLOYPATH
