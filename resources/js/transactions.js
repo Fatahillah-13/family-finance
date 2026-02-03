@@ -93,12 +93,19 @@ function renderMonthLabel() {
 }
 
 function highlightActiveTab() {
-    document
-        .querySelectorAll(".tab-btn")
-        .forEach((b) => b.classList.remove("bg-gray-100"));
-    document
-        .querySelector(`.tab-btn[data-type="${state.type}"]`)
-        ?.classList.add("bg-gray-100");
+    const tabs = document.querySelectorAll(".tab-btn");
+    tabs.forEach((b) => {
+        const isActive = b.dataset.type === state.type;
+        b.classList.toggle("bg-indigo-50", isActive);
+        b.classList.toggle("border-indigo-600", isActive);
+        b.classList.toggle("text-indigo-600", isActive);
+        b.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    const txListEl = document.getElementById("txList");
+    if (txListEl) {
+        txListEl.setAttribute("aria-labelledby", `tab-${state.type}`);
+    }
 }
 
 function setLoading(isLoading) {

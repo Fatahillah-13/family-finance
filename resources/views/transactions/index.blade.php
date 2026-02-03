@@ -23,21 +23,22 @@
 
             <!-- Tabs -->
             <div class="bg-white shadow-sm sm:rounded-lg p-3">
-                <div class="flex gap-2">
-                    <button class="tab-btn px-3 py-2 rounded border" data-type="expense">Expense</button>
-                    <button class="tab-btn px-3 py-2 rounded border" data-type="income">Income</button>
-                    <button class="tab-btn px-3 py-2 rounded border" data-type="transfer">Transfer</button>
+                <div class="flex gap-2" role="tablist" aria-label="Transaction types">
+                    <button id="tab-expense" class="tab-btn px-3 py-2 rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500" data-type="expense" role="tab" aria-selected="true" aria-controls="txList">Expense</button>
+                    <button id="tab-income" class="tab-btn px-3 py-2 rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500" data-type="income" role="tab" aria-selected="false" aria-controls="txList">Income</button>
+                    <button id="tab-transfer" class="tab-btn px-3 py-2 rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500" data-type="transfer" role="tab" aria-selected="false" aria-controls="txList">Transfer</button>
                 </div>
 
                 <div class="mt-3 flex gap-2">
-                    <input id="q" type="text" class="w-full border-gray-300 rounded"
+                    <label for="q" class="sr-only">Search transactions</label>
+                    <x-text-input id="q" type="text" class="w-full"
                         placeholder="Search description..." />
-                    <button id="searchBtn" class="px-3 py-2 border rounded">Search</button>
+                    <button id="searchBtn" class="px-3 py-2 border rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors">Search</button>
                 </div>
             </div>
 
             <!-- List -->
-            <div id="txList" class="space-y-2"></div>
+            <div id="txList" class="space-y-2" role="tabpanel" aria-labelledby="tab-expense"></div>
 
             <!-- Load more -->
             <div class="flex justify-center">
